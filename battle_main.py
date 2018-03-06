@@ -260,12 +260,14 @@ class Game:
             self.fields[1].shoot_at(position)
             if self.fields[0].destroyed == 10:
                 print("Player 1, you win!")
+                break
             print("Player 2, your turn! Good luck!")
             print(self.fields[0].field_without_ships())
             position = self.read_position(self.players[1])
             self.fields[0].shoot_at(position)
             if self.fields[1].destroyed == 10:
                 print("Player 2, you win!")
+                break
 
 
 if __name__ == '__main__':
