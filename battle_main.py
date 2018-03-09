@@ -1,73 +1,129 @@
 # The module created to represent BattleShip game with OOP
 
-from battle import change, has_ship, find_foreign, is_valid, ship_size, \
+
+from battle_functions import change, has_ship, find_foreign, is_valid, \
+    ship_size, \
     field_to_str
 from copy import deepcopy
 from random import randrange
+from sys import exit
 
 
 class Ship:
     """
     Class for representing ships
     """
-
-    def __init__(self, lenght, cells, horisontal=True, bow=(0, 0)):
+    def __init__(self, bow, length, parts):
         self.bow = bow
-        self.horisontal = horisontal
-        self.__length = lenght
-        self.cell = cells
+        self.__length = length
+        self.parts = parts
         self.__hit = []
-
-    def shoot_at(self, part):
-        """
-        Do shooting
-        part: part you will shoot
-        """
-        self.__hit.append(part)
 
     def delete_ship(self):
         """
-        Deleting ship, if list of shoot sides is equal to all ship sides
+        Allows to know whether ship is destroyed
+        return: parts of the ship if destroyed, else - False
         """
         if len(self.__hit) == self.__length:
-            points = self.cell
-            return points, self
+            return self.parts
         return False
+
+    def shoot_at(self, point):
+        """
+        Appends shoot part to self.__hit
+        point: shoot part
+        return: calls self.delete_ship() to check whether ship has already
+        destroyed
+        """
+        self.__hit.append(point)
+        return self.delete_ship()
 
 
 class Field:
     """
-    Class for representing fields for BattleShip game
+    Class for representing game field
     """
-
     def __init__(self):
-        self.__ships = []
-        self.field = self.generate_field()
-        self.destroyed = 0
+        self.ships = []
+        self.field = self.correct_ships()
+
+    def field_without_ships(self):
+        """
+        Shows field without ships
+        """
+        field = field_to_str(self.field).replace('*', '-')
+        return field
+
+    def field_with_ships(self):
+        """
+        Shows field with ships
+        """
+        return field_to_str(self.field)
 
     def _find_ship_for_position(self, position):
         """
-        tuple -> Ship
-        position: position with part of the ship
-        return: all ship
+        Finds ship for its part
+        position: coordinates of the part
+        return: ship
         """
-        for ship in self.__ships:
-            if position in ship.cell:
+        for ship in self.ships:
+            if position in ship.parts:
                 return ship
+
+    def mark_cell(self, point, mark):
+        """
+        Make specified mark on the game field
+        point: coordinates of the point
+        mark: type of mark
+        """
+        self.field[point[1] - 1][ord(point[0]) - 65] = mark
+
+    def shoot_at(self, point, player):
+        """
+        Makes shoot
+        point: point we get on
+        player: player who was shoot
+        return: True, if shoot was successful
+        """
+        if self.field[point[1] - 1][ord(point[0]) - 65] == '*':
+            ship = self._find_ship_for_position(point)
+            self.mark_cell(point, '+')
+            directions = [(0, 1), (0, -1), (-1, 0), (1, 0), (-1, 1), (1, 1),
+                          (-1, -1), (1, -1)]
+            parts = ship.shoot_at(point)
+            if parts:
+                for i in parts:
+                    self.mark_cell(i, 'Y')
+                    for x in directions:
+                        try:
+                            coord = (chr(ord(i[0]) + x[0]), i[1] +
+                                     x[1])
+                            if not 0 <= ord(coord[0]) - 65 < 10 \
+                                    or not 0 < coord[1] <= 10:
+                                raise IndexError
+                            if coord not in ship.parts:
+                                self.mark_cell(coord, 'X')
+                        except IndexError:
+                            continue
+                self.ships.remove(ship)
+                player.ships -= 1
+            return True
+        else:
+            self.mark_cell(point, 'X')
 
     def _find_ship(self, bow):
         """
         If ship with such bow exist - returns True
         bow: bow of the ship
         """
-        for ship in self.__ships:
+        for ship in self.ships:
             if ship.bow == bow:
                 return True
 
     def _add_ships(self, field):
         """
-        Adds ships (Ship) to the field
-        field: BattleShip game field
+        Adds objects Ship to the Field
+        field: object Field
         """
         for row in range(10):
             for point in range(10):
@@ -75,13 +131,7 @@ class Field:
                     ship = ship_size((chr(point + 65), row + 1), field)
                     bow = min(ship[1])
                     if not self._find_ship(bow):
-                        try:
-                            horizontal = True if ship[1][0] == ship[1][1] \
-                                else False
-                        except IndexError:
-                            horizontal = True
-                        self.__ships.append(Ship(len(ship[1]), ship[1],
-                                               horizontal, bow))
+                        self.ships.append(Ship(bow, ship[0], ship[1]))
 
     def _generate_ships(ships, rows, columns, directions, field):
         """
@@ -92,7 +142,6 @@ class Field:
         directions: available directions (left, right, up, down)
         field: game field
         """
-        ships2 = {4: [], 3: [], 2: [], 1: []}
         for x in ships:
             # Begins with ship with size 4
             number = ships[x]
@@ -124,58 +173,27 @@ class Field:
                                 for point in coordinates:
                                     r, c = point[1] - 1, ord(point[0]) - 65
                                     field[r][c] = '*'
-                                ships2[x].append(coordinates)
                                 break
                         except IndexError:
                             continue
-        return field, ships2
+        return field
 
     _generate_ships = staticmethod(_generate_ships)
 
-    def mark_cell(self, point, mark):
+    def correct_ships(self):
         """
-        Make specified mark on the game field
-        point: coordinates of the point
-        mark: type of mark
+        Makes ships placement correct
         """
-        self.field[point[1] - 1][ord(point[0]) - 65] = mark
-
-    def shoot_at(self, point):
-        """
-        Allows to shoot Ship
-        point: coordinates of shoot point
-        """
-        print(point)
-        if self.field[point[1] - 1][ord(point[0]) - 65] == '*':
-            ship = self._find_ship_for_position(point)
-            ship.shoot_at(point)
-            points = ship.delete_ship()
-            self.mark_cell(point, '+')
-
-
-            # If ship is dead
-            if points:
-                for i in points[0]:
-                    self.mark_cell(i, 'Y')
-
-                # removing ship from field ships list
-                self.__ships.remove(points[1])
-                self.destroyed += 1
-        else:
-            self.mark_cell(point, 'X')
-
-    def field_without_ships(self):
-        """
-        Shows field without ships
-        """
-        field = field_to_str(self.field).replace('*', '-')
-        return field
-
-    def field_with_ships(self):
-        """
-        Shows field with ships
-        """
-        return field_to_str(self.field)
+        # Adding ships
+        field = self.generate_field()
+        self._add_ships(field)
+        while True:
+            for i in range(20):
+                self.ships = []
+                self._add_ships(field)
+                if len(self.ships) == 10:
+                    return field
+            field = self.generate_field()
 
     def generate_field(self):
         """
@@ -189,37 +207,31 @@ class Field:
         field = [['-'] * 10 for i in range(10)]
         field1 = self._generate_ships(ships, rows, columns, directions,
                                       deepcopy(field))
-        while not is_valid(field1[0]):
+        while not is_valid(field1):
             field1 = self._generate_ships(ships, rows, columns, directions,
                                           deepcopy(field))
 
-        field = field1[0]
-        # Adding ships
-        self._add_ships(field)
+        field = field1
         return field
 
 
 class Player:
     """
-    Created to represent Player
+    Class for representing field
     """
-
-    def __init__(self, name, field):
+    def __init__(self, name):
         self.name = name
-        self.field = field
+        self.own = Field()
+        self.ships = 10
 
 
 class Game:
     """
     Represents BattleShip Game
     """
-
     def __init__(self):
         players = self._intro()
-        self.fields = [Field(), Field()]
-        self.players = [Player(players[0], self.fields[0]),
-                        Player(players[1], self.fields[1])]
-        self.run()
+        self.player1, self.player2 = Player(players[0]), Player(players[1])
 
     def _intro():
         """
@@ -241,34 +253,49 @@ class Game:
         return: coordinates of the position
         """
         while True:
-            answer = input("Player {}, enter move: ".format(player.name))
-            print(answer[1::])
-            if len(answer) in (2, 3) and 64 < ord(answer[0]) < 75 \
-                    and 0 < int(answer[1::]) < 11:
-                return answer[0], int(answer[1::])
+            try:
+                answer = input("Player {}, enter move: ".format(player.name))
+                if len(answer) in (2, 3) and 64 < ord(answer[0]) < 75 \
+                        and 0 < int(answer[1::]) < 11:
+                    return answer[0], int(answer[1::])
+            except Exception:
+                continue
 
     read_position = staticmethod(read_position)
 
+    def player_turn(self, player, opponent):
+        """
+        Run players turn
+        player: player who make shoot
+        opponent: players opponent
+        return: True, if shoot was successful
+        """
+        print("Player {}, your turn!".format(player.name))
+        print("Your field: \n")
+        print(player.own.field_with_ships(), '\n')
+        print('Opponent field: \n')
+        print(opponent.own.field_without_ships())
+        position = self.read_position(player)
+        shooting = opponent.own.shoot_at(position, opponent)
+        if opponent.ships == 0:
+            print("Player {}, you win!".format(player.name))
+            exit()
+        return shooting
+
     def run(self):
         """
-        Run the BattleShip game
+        Main function, run whole game, make players turn
         """
         while True:
-            print("Player 1, your turn! Good luck!")
-            print(self.fields[1].field_without_ships())
-            position = self.read_position(self.players[0])
-            self.fields[1].shoot_at(position)
-            if self.fields[0].destroyed == 10:
-                print("Player 1, you win!")
-                break
-            print("Player 2, your turn! Good luck!")
-            print(self.fields[0].field_without_ships())
-            position = self.read_position(self.players[1])
-            self.fields[0].shoot_at(position)
-            if self.fields[1].destroyed == 10:
-                print("Player 2, you win!")
-                break
+            shooting = self.player_turn(self.player1, self.player2)
+            while shooting:
+                shooting = self.player_turn(self.player1, self.player2)
+            shooting = self.player_turn(self.player2, self.player1)
+            while shooting:
+                shooting = self.player_turn(self.player2, self.player1)
 
 
 if __name__ == '__main__':
-    g = Game()
+    m = Game()
+    m.run()
+
